@@ -1,7 +1,18 @@
+spring:
+  datasource:
+    username: credhub_root
+    password: credhub_root_secret
+    url: jdbc:postgresql:credhub
+
+flyway:
+  locations: classpath:/db/migration/common,classpath:/db/migration/postgres
+
 auth_server:
   # Public dummy UAA for local development usage only!
   # Username/password: credhub/password
-  url: https://34.206.233.195:8443
+  url: http://localhost:8080/uaa
+  username: admin
+  password: adminsecret
   trust_store: src/test/resources/auth_server_trust_store.jks
   trust_store_password: changeit
 
@@ -19,13 +30,13 @@ security:
       jwt:
         key_value: |
           -----BEGIN PUBLIC KEY-----
-          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo9hvZNbP3U9Ory1aTHt7
-          OXucx2Ur0mhyrzKeB1T9R3gLuUCYXBUuc2PhhoQ5aKP+ii3UsWVx0WUsdLmX+8x2
-          iHDZ20ZCCg9MrOgAhVDsGGx3eNjNRdbk3RaeDJlI4RD1cy8+cMza2dp7h2Yk8Um6
-          U/+vXDBIdsKAQZayrm4X1xIc27D78KPSZeP3ux2qV7y4j5CHLjhg5mxnfWpJxltD
-          G1YtacCIbL3H41NVboqerJopZbtGAGh6/60GriUqf1z82TVaovOUp/HfGLF3OK8G
-          BYbcCW+Z3N1Q4QFKiNcNjWZNViKGAysdhogp/P6xb8cFFksiKFOi6HyWEW8/wr8w
-          CwIDAQAB
+          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0m59l2u9iDnMbrXHfqkO
+          rn2dVQ3vfBJqcDuFUK03d+1PZGbVlNCqnkpIJ8syFppW8ljnWweP7+LiWpRoz0I7
+          fYb3d8TjhV86Y997Fl4DBrxgM6KTJOuE/uxnoDhZQ14LgOU2ckXjOzOdTsnGMKQB
+          LCl0vpcXBtFLMaSbpv1ozi8h7DJyVZ6EnFQZUWGdgTMhDrmqevfx95U/16c5WBDO
+          kqwIn7Glry9n9Suxygbf8g5AzpWcusZgDLIIZ7JTUldBb8qU2a0Dl4mvLZOn4wPo
+          jfj9Cw2QICsc5+Pwf21fP+hzf+1WSRHbnYv8uanRO0gZ8ekGaghM/2H6gqJbo2nI
+          JwIDAQAB
           -----END PUBLIC KEY-----
   authorization:
     acls:
