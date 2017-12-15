@@ -10,9 +10,12 @@ flyway:
 auth_server:
   # Public dummy UAA for local development usage only!
   # Username/password: credhub/password
+<<<<<<< HEAD
   url: http://localhost:8080/uaa
   username: admin
   password: adminsecret
+=======
+>>>>>>> upstream/master
   trust_store: src/test/resources/auth_server_trust_store.jks
   trust_store_password: changeit
 
@@ -25,6 +28,7 @@ encryption:
   key_creation_enabled: true
   
 security:
+<<<<<<< HEAD
   oauth2:
     resource:
       jwt:
@@ -38,6 +42,8 @@ security:
           jfj9Cw2QICsc5+Pwf21fP+hzf+1WSRHbnYv8uanRO0gZ8ekGaghM/2H6gqJbo2nI
           JwIDAQAB
           -----END PUBLIC KEY-----
+=======
+>>>>>>> upstream/master
   authorization:
     acls:
       # Change to true to enable ACL enforcement
@@ -59,3 +65,7 @@ server:
     trust_store_password: changeit
     trust_store_type: JKS
     enabled-protocols: TLSv1.2
+
+spring:
+  profiles:
+    include: dev-h2,dev-remote-uaa
