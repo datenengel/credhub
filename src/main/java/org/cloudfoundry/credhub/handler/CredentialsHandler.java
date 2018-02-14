@@ -52,11 +52,16 @@ public class CredentialsHandler {
     return getNCredentialVersions(credentialName, null, auditRecordParametersList);
   }
 
-  public DataResponse getMostRecentCredentialVersion(
+  public DataResponse getCurrentCredentialVersions(
       String credentialName,
       List<EventAuditRecordParameters> auditRecordParametersList
   ) {
-    return getNCredentialVersions(credentialName, 1, auditRecordParametersList);
+    List<CredentialVersion> credentialVersions = credentialService.findActiveByName(credentialName, auditRecordParametersList);
+
+    if (credentialVersions.isEmpty()) {
+      throw new EntryNotFoundException("error.credential.invalid_access");
+    }
+    return DataResponse.fromEntity(credentialVersions);
 
   }
 
@@ -64,6 +69,6 @@ public class CredentialsHandler {
       String credentialUUID,
       List<EventAuditRecordParameters> auditRecordParametersList
   ) {
-    return CredentialView.fromEntity(credentialService.findByUuid(credentialUUID, auditRecordParametersList));
+    return CredentialView.fromEntity(credentialService.findVersionByUuid(credentialUUID, auditRecordParametersList));
   }
 }

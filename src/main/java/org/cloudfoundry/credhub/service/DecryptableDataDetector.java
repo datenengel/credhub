@@ -1,22 +1,25 @@
 package org.cloudfoundry.credhub.service;
 
 import org.cloudfoundry.credhub.data.CredentialVersionDataService;
-import java.util.ArrayList;
+import org.springframework.stereotype.Component;
+
+import java.util.Collection;
 import java.util.UUID;
 
+@Component
 public class DecryptableDataDetector {
 
-  private EncryptionKeyCanaryMapper encryptionKeyCanaryMapper;
+  private EncryptionKeySet keySet;
   private CredentialVersionDataService credentialVersionDataService;
 
-  DecryptableDataDetector(EncryptionKeyCanaryMapper encryptionKeyCanaryMapper,
+  DecryptableDataDetector(EncryptionKeySet keySet,
                           CredentialVersionDataService credentialVersionDataService) {
-    this.encryptionKeyCanaryMapper = encryptionKeyCanaryMapper;
+    this.keySet = keySet;
     this.credentialVersionDataService = credentialVersionDataService;
   }
 
   public void check() {
-    ArrayList<UUID> uuids = encryptionKeyCanaryMapper.getKnownCanaryUuids();
+    Collection<UUID> uuids = keySet.getUuids();
 
     Long countTotalCredentials = credentialVersionDataService.count();
     Long countCredentialsEncryptedWithKeyWeHave = credentialVersionDataService.countEncryptedWithKeyUuidIn(uuids);

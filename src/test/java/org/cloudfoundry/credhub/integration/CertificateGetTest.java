@@ -5,9 +5,12 @@ import com.jayway.jsonpath.JsonPath;
 import org.cloudfoundry.credhub.CredentialManagerApp;
 import org.cloudfoundry.credhub.constants.CredentialWriteMode;
 import org.cloudfoundry.credhub.helper.AuditingHelper;
+import org.cloudfoundry.credhub.helper.RequestHelper;
 import org.cloudfoundry.credhub.repository.EventAuditRecordRepository;
 import org.cloudfoundry.credhub.repository.RequestAuditRecordRepository;
+import org.cloudfoundry.credhub.util.AuthConstants;
 import org.cloudfoundry.credhub.util.DatabaseProfileResolver;
+import org.json.JSONArray;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -23,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
+import java.util.Map;
 
+import static org.cloudfoundry.credhub.audit.AuditingOperationCode.CREDENTIAL_ACCESS;
 import static org.cloudfoundry.credhub.audit.AuditingOperationCode.CREDENTIAL_FIND;
 import static org.cloudfoundry.credhub.helper.RequestHelper.generateCa;
 import static org.cloudfoundry.credhub.helper.RequestHelper.generateCertificateCredential;
@@ -39,6 +44,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.core.IsEqual.equalTo;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -178,5 +184,86 @@ public class CertificateGetTest {
 
     assertThat(response, containsString("The request could not be completed because the credential does not exist or you do not have sufficient authorization."));
     auditingHelper.verifyAuditing(CREDENTIAL_FIND, "/my-certificate", UAA_OAUTH2_CLIENT_CREDENTIALS_ACTOR_ID, "/api/v1/certificates", 404);
+  }
+
+  @Test
+  public void getCertificateVersionsByCredentialId_returnsAllVersionsOfTheCertificateCredential() throws Exception {
+    String firstResponse = generateCertificateCredential(mockMvc, "/first-certificate", CredentialWriteMode.OVERWRITE.mode, "test", null);
+    String secondResponse = generateCertificateCredential(mockMvc, "/first-certificate", CredentialWriteMode.OVERWRITE.mode, "test", null);
+
+    String firstVersion = JsonPath.parse(firstResponse).read("$.id");
+    String secondVersion = JsonPath.parse(secondResponse).read("$.id");
+
+    String response = getCertificateCredentialsByName(mockMvc, UAA_OAUTH2_PASSWORD_GRANT_TOKEN, "/first-certificate");
+
+    String certificateId  = JsonPath.parse(response).read("$.certificates[0].id");
+
+    MockHttpServletRequestBuilder getVersions = get("/api/v1/certificates/" + certificateId + "/versions")
+        .header("Authorization", "Bearer " + UAA_OAUTH2_PASSWORD_GRANT_TOKEN)
+        .accept(APPLICATION_JSON)
+        .contentType(APPLICATION_JSON);
+
+    String responseVersion = mockMvc.perform(getVersions)
+        .andDo(print())
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+
+    List<Map<String, String>> certificates = JsonPath.parse(responseVersion).read("$");
+
+    assertThat(certificates, hasSize(2));
+    assertThat(certificates.get(0).get("id"), containsString(secondVersion));
+    assertThat(certificates.get(1).get("id"), containsString(firstVersion));
+
+    auditingHelper.verifyAuditing(CREDENTIAL_ACCESS, "/first-certificate", UAA_OAUTH2_PASSWORD_GRANT_ACTOR_ID, "/api/v1/certificates/"+ certificateId+ "/versions", 200);
+
+  }
+
+  @Test
+  public void getCertificateVersionsByCredentialId_withCurrentTrue_returnsCurrentVersionsOfTheCertificateCredential() throws Exception {
+    String credentialName = "/test-certificate";
+
+    generateCertificateCredential(mockMvc, credentialName, CredentialWriteMode.OVERWRITE.mode, "test", null);
+
+    String response = getCertificateCredentialsByName(mockMvc, UAA_OAUTH2_PASSWORD_GRANT_TOKEN, credentialName);
+    String uuid = JsonPath.parse(response)
+        .read("$.certificates[0].id");
+
+    String transitionalCertificate = JsonPath.parse(RequestHelper.regenerateCertificate(mockMvc, uuid, true))
+        .read("$.value.certificate");
+
+    String nonTransitionalCertificate = JsonPath.parse(RequestHelper.regenerateCertificate(mockMvc, uuid, false))
+        .read("$.value.certificate");
+
+    final MockHttpServletRequestBuilder request = get("/api/v1/certificates/" + uuid + "/versions?current=true")
+        .header("Authorization", "Bearer " + AuthConstants.UAA_OAUTH2_PASSWORD_GRANT_TOKEN)
+        .accept(APPLICATION_JSON);
+
+    response = mockMvc.perform(request)
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+
+    JSONArray jsonArray = new JSONArray(response);
+
+    assertThat(jsonArray.length(), equalTo(2));
+    List<String> certificates = JsonPath.parse(response)
+        .read("$[*].value.certificate");
+    assertThat(certificates, containsInAnyOrder(transitionalCertificate, nonTransitionalCertificate));
+  }
+
+  @Test
+  public void getCertificateVersionsByCredentialId_returnsError_whenUUIDIsInvalid() throws Exception {
+
+    MockHttpServletRequestBuilder get = get("/api/v1/certificates/" + "fake-uuid" + "/versions")
+        .header("Authorization", "Bearer " + UAA_OAUTH2_PASSWORD_GRANT_TOKEN)
+        .accept(APPLICATION_JSON)
+        .contentType(APPLICATION_JSON);
+
+    String response = mockMvc.perform(get)
+        .andDo(print())
+        .andExpect(status().is4xxClientError())
+        .andReturn().getResponse().getContentAsString();
+
+      assertThat(response, containsString("The request could not be completed because the credential does not exist or you do not have sufficient authorization."));
+      auditingHelper.verifyAuditing(CREDENTIAL_ACCESS, null, UAA_OAUTH2_PASSWORD_GRANT_ACTOR_ID, "/api/v1/certificates/fake-uuid/versions", 404);
   }
 }

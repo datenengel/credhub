@@ -2,7 +2,9 @@ package org.cloudfoundry.credhub.controller.v1;
 
 import org.cloudfoundry.credhub.data.CredentialVersionDataService;
 import org.cloudfoundry.credhub.data.EncryptionKeyCanaryDataService;
-import org.cloudfoundry.credhub.service.EncryptionKeyCanaryMapper;
+import org.cloudfoundry.credhub.service.EncryptionKey;
+import org.cloudfoundry.credhub.service.EncryptionKeySet;
+import org.cloudfoundry.credhub.service.EncryptionService;
 import org.cloudfoundry.credhub.util.DatabaseProfileResolver;
 import org.junit.Before;
 import org.junit.Test;
@@ -14,7 +16,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import java.util.ArrayList;
+import java.security.Key;
+import java.util.HashMap;
 import java.util.UUID;
 
 import static org.mockito.Mockito.mock;
@@ -33,15 +36,15 @@ public class KeyUsageControllerTest {
   private MockMvc mockMvc;
   CredentialVersionDataService credentialVersionDataService;
   EncryptionKeyCanaryDataService encryptionKeyCanaryDataService;
-  EncryptionKeyCanaryMapper encryptionKeyCanaryMapper;
+  EncryptionKeySet keySet;
 
   @Before
   public void beforeEach() {
     credentialVersionDataService = mock(CredentialVersionDataService.class);
-    encryptionKeyCanaryMapper = mock(EncryptionKeyCanaryMapper.class);
+    keySet = new EncryptionKeySet();
     encryptionKeyCanaryDataService = mock(EncryptionKeyCanaryDataService.class);
     final KeyUsageController keyUsageController = new KeyUsageController(credentialVersionDataService,
-        encryptionKeyCanaryMapper);
+        keySet);
 
     mockMvc = MockMvcBuilders
         .standaloneSetup(keyUsageController)
@@ -52,21 +55,25 @@ public class KeyUsageControllerTest {
   @Test
   public void getKeyUsages_getsKeyDistributionAcrossActiveInactiveAndUnknownEncryptionKeys()
       throws Exception {
-    ArrayList<UUID> keysInConfigUuids = new ArrayList<UUID>() {{
-      add(UUID.randomUUID());
-      add(UUID.randomUUID());
-    }};
+    final UUID activeKey = UUID.randomUUID();
+    final UUID knownKey = UUID.randomUUID();
+    final UUID unknownKey = UUID.randomUUID();
 
-    when(encryptionKeyCanaryMapper.getKnownCanaryUuids()).thenReturn(keysInConfigUuids);
-    when(credentialVersionDataService.count()).thenReturn(225L);
-    when(credentialVersionDataService.countAllNotEncryptedByActiveKey()).thenReturn(25L);
-    when(credentialVersionDataService.countEncryptedWithKeyUuidIn(keysInConfigUuids)).thenReturn(220L);
+    HashMap<UUID, Long> countByEncryptionKey = new HashMap<>();
+    countByEncryptionKey.put(activeKey, 200L);
+    countByEncryptionKey.put(knownKey, 10L);
+    countByEncryptionKey.put(unknownKey, 5L);
+
+    keySet.add(new EncryptionKey(mock(EncryptionService.class), activeKey, mock(Key.class)));
+    keySet.add(new EncryptionKey(mock(EncryptionService.class), knownKey, mock(Key.class)));
+    keySet.setActive(activeKey);
+    when(credentialVersionDataService.countByEncryptionKey()).thenReturn(countByEncryptionKey);
 
     mockMvc.perform(get("/api/v1/key-usage"))
         .andExpect(status().isOk())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.active_key").value(200))
-        .andExpect(jsonPath("$.inactive_keys").value(20))
+        .andExpect(jsonPath("$.inactive_keys").value(10))
         .andExpect(jsonPath("$.unknown_keys").value(5));
   }
 
